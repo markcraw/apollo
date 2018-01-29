@@ -223,7 +223,9 @@ class ConvexHull2DXY : public pcl::ConvexHull<PointInT> {
     return;
   }
 
-  std::string getClassName() const { return ("ConvexHull2DXY"); }
+  std::string getClassName() const {
+    return ("ConvexHull2DXY");
+  }
 
  protected:
   using pcl::PCLBase<PointInT>::input_;
@@ -235,4 +237,4 @@ class ConvexHull2DXY : public pcl::ConvexHull<PointInT> {
 }  // namespace perception
 }  // namespace apollo
 
-#endif  // MODULES_PERCEPTION_OBSTACLE_COMMON_CONVEX_HULLXY_H
+#endif  // MODULES_PERCEPTION_OBSTACLE_COMMON_CONVEX_HULLXY_H_

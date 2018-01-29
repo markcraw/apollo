@@ -22,12 +22,12 @@
 #ifndef MODULES_PREDICTION_CONTAINER_OBSTACLES_OBSTACLES_CONTAINER_H_
 #define MODULES_PREDICTION_CONTAINER_OBSTACLES_OBSTACLES_CONTAINER_H_
 
-#include <mutex>
-
+#include "modules/common/macro.h"
 #include "modules/common/util/lru_cache.h"
 #include "modules/prediction/container/container.h"
 #include "modules/prediction/container/obstacles/obstacle.h"
 #include "modules/prediction/container/pose/pose_container.h"
+#include "modules/prediction/container/obstacles/obstacle_clusters.h"
 
 namespace apollo {
 namespace prediction {
@@ -81,8 +81,8 @@ class ObstaclesContainer : public Container {
 
  private:
   double timestamp_ = -1.0;
+  ObstacleClusters clusters_;
   common::util::LRUCache<int, Obstacle> obstacles_;
-  static std::mutex g_mutex_;
 };
 
 }  // namespace prediction

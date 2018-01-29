@@ -28,9 +28,7 @@ using apollo::common::TrajectoryPoint;
 namespace apollo {
 namespace planning {
 
-class RTKReplayPlannerTest : public ::testing::Test {};
-
-TEST_F(RTKReplayPlannerTest, ComputeTrajectory) {
+TEST(RTKReplayPlannerTest, ComputeTrajectory) {
   FLAGS_rtk_trajectory_filename = "modules/planning/testdata/garage.csv";
   FLAGS_enable_map_reference_unify = false;
   RTKReplayPlanner planner;
@@ -60,7 +58,7 @@ TEST_F(RTKReplayPlannerTest, ComputeTrajectory) {
   state.set_y(point.y());
   state.set_z(point.z());
   ReferenceLineInfo info(state, start_point, ref, segments);
-  auto status = planner.Plan(start_point, nullptr, &info);
+  auto status = planner.PlanOnReferenceLine(start_point, nullptr, &info);
 
   const auto& trajectory = info.trajectory();
   EXPECT_TRUE(status.ok());
@@ -77,7 +75,7 @@ TEST_F(RTKReplayPlannerTest, ComputeTrajectory) {
   EXPECT_DOUBLE_EQ(last_point->path_point().y(), 4140681.98605);
 }
 
-TEST_F(RTKReplayPlannerTest, ErrorTest) {
+TEST(RTKReplayPlannerTest, ErrorTest) {
   FLAGS_rtk_trajectory_filename =
       "modules/planning/testdata/garage_no_file.csv";
   FLAGS_enable_map_reference_unify = false;
@@ -108,7 +106,9 @@ TEST_F(RTKReplayPlannerTest, ErrorTest) {
   state.set_y(point.y());
   state.set_z(point.z());
   ReferenceLineInfo info(state, start_point, ref, segments);
-  EXPECT_TRUE(!(planner_with_error_csv.Plan(start_point, nullptr, &info)).ok());
+  EXPECT_TRUE(
+      !(planner_with_error_csv.PlanOnReferenceLine(start_point, nullptr, &info))
+           .ok());
 }
 
 }  // namespace planning

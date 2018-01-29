@@ -9,11 +9,11 @@ cc_library(
     ],
     hdrs = [
         "planning.h",
+        "planning_interface.h",
     ],
     deps = [
         "//modules/common",
         "//modules/common:apollo_app",
-        "//modules/common:log",
         "//modules/common/adapters:adapter_manager",
         "//modules/common/configs:config_gflags",
         "//modules/common/proto:pnc_point_proto",
@@ -21,8 +21,10 @@ cc_library(
         "//modules/map/hdmap:hdmap_util",
         "//modules/perception/proto:perception_proto",
         "//modules/planning/common:planning_common",
+        "//modules/planning/common:planning_thread_pool",
         "//modules/planning/common/trajectory:trajectory_stitcher",
         "//modules/planning/planner/em:em_planner",
+        "//modules/planning/planner/lattice:lattice_planner",
         "//modules/planning/planner/rtk:rtk_planner",
         "//modules/planning/proto:planning_proto",
         "//modules/planning/reference_line:reference_line_provider",

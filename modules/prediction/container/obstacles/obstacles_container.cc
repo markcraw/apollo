@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "modules/common/math/math_utils.h"
+#include "modules/prediction/common/feature_output.h"
 #include "modules/prediction/common/prediction_gflags.h"
 
 namespace apollo {
@@ -27,21 +28,23 @@ namespace prediction {
 using apollo::perception::PerceptionObstacle;
 using apollo::perception::PerceptionObstacles;
 
-std::mutex ObstaclesContainer::g_mutex_;
-
 ObstaclesContainer::ObstaclesContainer()
     : obstacles_(FLAGS_max_num_obstacles) {}
 
 void ObstaclesContainer::Insert(const ::google::protobuf::Message& message) {
-  ADEBUG << "message: " << message.ShortDebugString();
-  const PerceptionObstacles& perception_obstacles =
-      dynamic_cast<const PerceptionObstacles&>(message);
+  PerceptionObstacles perception_obstacles;
+  perception_obstacles.CopyFrom(
+      dynamic_cast<const PerceptionObstacles&>(message));
+
   double timestamp = 0.0;
   if (perception_obstacles.has_header() &&
       perception_obstacles.header().has_timestamp_sec()) {
     timestamp = perception_obstacles.header().timestamp_sec();
   }
-  if (timestamp <= timestamp_ - FLAGS_replay_timestamp_gap) {
+  if (std::fabs(timestamp - timestamp_) > FLAGS_replay_timestamp_gap) {
+    if (FLAGS_prediction_offline_mode) {
+      FeatureOutput::Write();
+    }
     obstacles_.Clear();
     ADEBUG << "Replay mode is enabled.";
   } else if (timestamp <= timestamp_) {
@@ -52,6 +55,7 @@ void ObstaclesContainer::Insert(const ::google::protobuf::Message& message) {
 
   timestamp_ = timestamp;
   ADEBUG << "Current timestamp is [" << timestamp_ << "]";
+  clusters_.Init();
   for (const PerceptionObstacle& perception_obstacle :
        perception_obstacles.perception_obstacle()) {
     ADEBUG << "Perception obstacle [" << perception_obstacle.id() << "] "
@@ -73,7 +77,6 @@ void ObstaclesContainer::Clear() {
 
 void ObstaclesContainer::InsertPerceptionObstacle(
     const PerceptionObstacle& perception_obstacle, const double timestamp) {
-  std::lock_guard<std::mutex> lock(g_mutex_);
   const int id = perception_obstacle.id();
   if (id < -1) {
     AERROR << "Invalid ID [" << id << "]";
@@ -85,10 +88,10 @@ void ObstaclesContainer::InsertPerceptionObstacle(
   }
   Obstacle* obstacle_ptr = obstacles_.GetSilently(id);
   if (obstacle_ptr != nullptr) {
-    obstacle_ptr->Insert(perception_obstacle, timestamp);
+    obstacle_ptr->Insert(perception_obstacle, timestamp, &clusters_);
   } else {
     Obstacle obstacle;
-    obstacle.Insert(perception_obstacle, timestamp);
+    obstacle.Insert(perception_obstacle, timestamp, &clusters_);
     obstacles_.Put(id, std::move(obstacle));
   }
 }

@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "glog/logging.h"
 #include "modules/common/math/linear_interpolation.h"
 #include "modules/common/util/string_util.h"
 #include "modules/common/util/util.h"
@@ -102,8 +101,9 @@ std::string SpeedData::DebugString() const {
       std::min(speed_vector_.size(),
                static_cast<size_t>(FLAGS_trajectory_point_num_for_debug));
   return apollo::common::util::StrCat(
-      "[\n", apollo::common::util::PrintDebugStringIter(
-                 speed_vector_.begin(), speed_vector_.begin() + limit, ",\n"),
+      "[\n",
+      apollo::common::util::PrintDebugStringIter(
+          speed_vector_.begin(), speed_vector_.begin() + limit, ",\n"),
       "]\n");
 }
 

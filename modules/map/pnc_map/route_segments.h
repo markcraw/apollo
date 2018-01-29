@@ -15,7 +15,7 @@
  *****************************************************************************/
 
 /**
- * @file:
+ * @file
  **/
 
 #ifndef MODULES_MAP_PNC_MAP_ROUTE_SEGMENTS_H_
@@ -30,6 +30,7 @@
 
 #include "gflags/gflags.h"
 
+#include "modules/common/proto/pnc_point.pb.h"
 #include "modules/common/proto/vehicle_state.pb.h"
 #include "modules/routing/proto/routing.pb.h"
 
@@ -43,7 +44,8 @@ namespace hdmap {
  * @brief class RouteSegments
  *
  * This class is a representation of the Passage type in routing.proto.
- * It is exended from a passage region, but keeps some properties of the passage
+ * It is extended from a passage region, but keeps some properties of the
+ *passage
  * such as the last end LaneWaypoint of the original passage region
  * (route_end_waypoint), whether the passage can lead to another passage in
  * routing (can_exit_). This class contains the original data that can be used
@@ -84,7 +86,7 @@ class RouteSegments : public std::vector<LaneSegment> {
   void SetPreviousAction(routing::ChangeLaneType action);
 
   /**
-   * Wether the passage region that generate this route segment can lead to
+   * Whether the passage region that generate this route segment can lead to
    * another passage region in route.
    */
   bool CanExit() const;
@@ -92,21 +94,24 @@ class RouteSegments : public std::vector<LaneSegment> {
 
   /**
    * Project a point to this route segment.
-   * @param point_enu a map point.
+   * @param point_enu a map point, or point, which is a Vec2d point
    * @param s return the longitudinal s relative to the route segment.
    * @param l return the lateral distance relative to the route segment.
    * @param waypoint return the LaneWaypoint, which has lane and lane_s on the
    * route segment.
-   * @return false if error happended or projected outside of the lane segments.
+   * @return false if error happened or projected outside of the lane segments.
    */
-  bool GetProjection(const common::PointENU &point_enu, double *s, double *l,
-                     LaneWaypoint *waypoint) const;
-
+  bool GetProjection(const common::PointENU &point_enu,
+                     common::SLPoint *sl_point, LaneWaypoint *waypoint) const;
+  bool GetProjection(const common::math::Vec2d &point,
+                     common::SLPoint *sl_point, LaneWaypoint *waypoint) const;
   /**
-   * Check whether the map allows a vehicle can reach current RouteSegment from
+   * Check whether the map allows a vehicle can reach current RouteSegment
+   * from
    * a point on a lane (LaneWaypoint).
    * @param waypoint the start waypoint
-   * @return true if the map allows a vehicle to drive from waypoint to current
+   * @return true if the map allows a vehicle to drive from waypoint to
+   * current
    * RouteSegment. Otherwise false.
    */
   bool CanDriveFrom(const LaneWaypoint &waypoint) const;
@@ -120,11 +125,38 @@ class RouteSegments : public std::vector<LaneSegment> {
   const LaneWaypoint &RouteEndWaypoint() const;
   void SetRouteEndWaypoint(const LaneWaypoint &waypoint);
 
+  /** Stitch current route segments with the other route segment.
+   * Example 1
+   * this:   |--------A-----x-----B------|
+   * other:                 |-----B------x--------C-------|
+   * Result: |--------A-----x-----B------x--------C-------|
+   * In the above example, A-B is current route segments, and B-C is the other
+   * route segments. We update current route segments to A-B-C.
+   *
+   * Example 2
+   * this:                  |-----A------x--------B-------|
+   * other:  |--------C-----x-----A------|
+   * Result: |--------C-----x-----A------x--------B-------|
+   * In the above example, A-B is current route segments, and C-A is the other
+   * route segments. We update current route segments to C-A-B
+   *
+   * @return false if these two reference line cannot be stitched
+   */
+  bool Stitch(const RouteSegments &other);
+
+  bool Shrink(const common::math::Vec2d &point, const double look_backward,
+              const double look_forward);
+
   bool IsOnSegment() const;
   void SetIsOnSegment(bool on_segment);
 
   void SetId(const std::string &id);
   const std::string &Id() const;
+
+  /**
+   * Get the first waypoint from the lane segments.
+   */
+  LaneWaypoint FirstWaypoint() const;
 
   /**
    * Get the last waypoint from the lane segments.
@@ -136,17 +168,40 @@ class RouteSegments : public std::vector<LaneSegment> {
    */
   bool IsWaypointOnSegment(const LaneWaypoint &waypoint) const;
 
+  /**
+   * @brief Check if we can reach the other segment from current segment just
+   * by following lane.
+   * @param other Another route segment
+   */
+  bool IsConnectedSegment(const RouteSegments &other) const;
+
+  bool StopForDestination() const;
+  void SetStopForDestination(bool stop_for_destination);
+
+  /**
+   * Copy the properties of other segments to current one
+   */
+  void SetProperties(const RouteSegments &other);
+
   static bool WithinLaneSegment(const LaneSegment &lane_segment,
                                 const LaneWaypoint &waypoint);
 
+  static bool WithinLaneSegment(const LaneSegment &lane_segment,
+                                const routing::LaneWaypoint &waypoint);
+
   static bool WithinLaneSegment(const routing::LaneSegment &lane_segment,
                                 const LaneWaypoint &waypoint);
+
+  static bool WithinLaneSegment(const routing::LaneSegment &lane_segment,
+                                const routing::LaneWaypoint &waypoint);
+
+  static double Length(const RouteSegments &segments);
 
  private:
   LaneWaypoint route_end_waypoint_;
 
   /**
-   * wheter this segment can lead to another passage region in routing
+   * whether this segment can lead to another passage region in routing
    */
   bool can_exit_ = false;
 
@@ -160,6 +215,13 @@ class RouteSegments : public std::vector<LaneSegment> {
   routing::ChangeLaneType previous_action_ = routing::FORWARD;
 
   std::string id_;
+
+  /**
+   * Whether the vehicle should stop for destination. In a routing that has
+   * loops, the adc may pass by destination many times, but it only need to stop
+   * for destination  in the last loop.
+   */
+  bool stop_for_destination_ = false;
 };
 
 }  // namespace hdmap

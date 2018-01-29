@@ -153,8 +153,9 @@ std::string PathData::DebugString() const {
                static_cast<size_t>(FLAGS_trajectory_point_num_for_debug));
 
   return apollo::common::util::StrCat(
-      "[\n", apollo::common::util::PrintDebugStringIter(
-                 path_points.begin(), path_points.begin() + limit, ",\n"),
+      "[\n",
+      apollo::common::util::PrintDebugStringIter(
+          path_points.begin(), path_points.begin() + limit, ",\n"),
       "]\n");
 }
 
@@ -185,11 +186,14 @@ bool PathData::SLToXY(const FrenetFramePath &frenet_path,
 
     if (path_points.empty()) {
       path_point.set_s(0.0);
+      path_point.set_dkappa(0.0);
     } else {
       common::math::Vec2d last(path_points.back().x(), path_points.back().y());
       common::math::Vec2d current(path_point.x(), path_point.y());
       double distance = (last - current).Length();
       path_point.set_s(path_points.back().s() + distance);
+      path_point.set_dkappa((path_point.kappa() - path_points.back().kappa()) /
+                            distance);
     }
     path_points.push_back(std::move(path_point));
   }

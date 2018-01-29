@@ -24,13 +24,16 @@
 
 #include <deque>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "Eigen/Dense"
+
+#include "modules/common/filters/digital_filter.h"
 #include "modules/common/proto/error_code.pb.h"
 #include "modules/perception/proto/perception_obstacle.pb.h"
+#include "modules/prediction/container/obstacles/obstacle_clusters.h"
 #include "modules/prediction/proto/feature.pb.h"
 
 #include "modules/common/math/kalman_filter.h"
@@ -52,7 +55,7 @@ class Obstacle {
   /**
    * @brief Constructor
    */
-  Obstacle() = default;
+  Obstacle();
 
   /**
    * @brief Destructor
@@ -65,7 +68,8 @@ class Obstacle {
    * @param timestamp The timestamp when the perception obstacle was detected.
    */
   void Insert(const perception::PerceptionObstacle& perception_obstacle,
-              const double timestamp);
+              const double timestamp,
+              ObstacleClusters* const obstacle_clusters);
 
   /**
    * @brief Get the type of perception obstacle's type.
@@ -144,13 +148,48 @@ class Obstacle {
    */
   bool IsOnLane();
 
+  /**
+   * @brief Check if the obstacle is near a junction.
+   * @return If the obstacle is near a junction.
+   */
+  bool IsNearJunction();
+
+  /**
+   * @brief Set RNN state
+   * @param RNN state matrix
+   */
+  void SetRNNStates(const std::vector<Eigen::MatrixXf>& rnn_states);
+
+  /**
+   * @brief Get RNN state
+   * @param A pointer to RNN state matrix
+   */
+  void GetRNNStates(std::vector<Eigen::MatrixXf>* rnn_states);
+
+  /**
+   * @brief Initialize RNN state
+   */
+  void InitRNNStates();
+
+  /**
+   * @brief Check if RNN is enabled
+   * @return True if RNN is enabled
+   */
+  bool RNNEnabled() const;
+
  private:
+  void SetStatus(const perception::PerceptionObstacle& perception_obstacle,
+                 double timestamp, Feature* feature);
+
+  void UpdateStatus(Feature* feature);
+
   common::ErrorCode SetId(
       const perception::PerceptionObstacle& perception_obstacle,
       Feature* feature);
 
   common::ErrorCode SetType(
-      const perception::PerceptionObstacle& perception_obstacle);
+      const perception::PerceptionObstacle& perception_obstacle,
+      Feature* feature);
 
   void SetTimestamp(const perception::PerceptionObstacle& perception_obstacle,
                     const double timestamp, Feature* feature);
@@ -161,6 +200,10 @@ class Obstacle {
   void SetVelocity(const perception::PerceptionObstacle& perception_obstacle,
                    Feature* feature);
 
+  void UpdateVelocity(const double theta, double* velocity_x,
+                      double* velocity_y, double* velocity_heading,
+                      double* speed);
+
   void SetAcceleration(Feature* feature);
 
   void SetTheta(const perception::PerceptionObstacle& perception_obstacle,
@@ -170,11 +213,9 @@ class Obstacle {
       const perception::PerceptionObstacle& perception_obstacle,
       Feature* feature);
 
-  void InitKFMotionTracker(Feature* feature);
+  void InitKFMotionTracker(const Feature& feature);
 
-  void UpdateKFMotionTracker(Feature* feature);
-
-  void UpdateMotionBelief(Feature* feature);
+  void UpdateKFMotionTracker(const Feature& feature);
 
   void InitKFLaneTracker(const std::string& lane_id, const double beta);
 
@@ -191,17 +232,18 @@ class Obstacle {
 
   void SetNearbyLanes(Feature* feature);
 
-  void SetLaneGraphFeature(Feature* feature);
+  void SetLaneGraphFeature(Feature* feature,
+                           ObstacleClusters* const obstacle_clusters);
 
   void SetLanePoints(Feature* feature);
 
-  void InitKFPedestrianTracker(Feature* feature);
+  void InitKFPedestrianTracker(const Feature& feature);
 
-  void UpdateKFPedestrianTracker(Feature* feature);
+  void UpdateKFPedestrianTracker(const Feature& feature);
 
   void SetMotionStatus();
 
-  void InsertFeatureToHistory(Feature* feature);
+  void InsertFeatureToHistory(const Feature& feature);
 
   void Trim();
 
@@ -212,12 +254,12 @@ class Obstacle {
   std::deque<Feature> feature_history_;
   common::math::KalmanFilter<double, 6, 2, 0> kf_motion_tracker_;
   common::math::KalmanFilter<double, 2, 2, 4> kf_pedestrian_tracker_;
-  bool kf_motion_tracker_enabled_ = false;
-  bool kf_pedestrian_tracker_enabled_ = false;
+  common::DigitalFilter heading_filter_;
   std::unordered_map<std::string, common::math::KalmanFilter<double, 4, 2, 0>>
       kf_lane_trackers_;
   std::vector<std::shared_ptr<const hdmap::LaneInfo>> current_lanes_;
-  static std::mutex mutex_;
+  std::vector<Eigen::MatrixXf> rnn_states_;
+  bool rnn_enabled_ = false;
 };
 
 }  // namespace prediction

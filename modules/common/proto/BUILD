@@ -129,3 +129,35 @@ proto_library(
         ":header_proto_lib",
     ],
 )
+
+cc_proto_library(
+    name = "drive_event_proto",
+    deps = [
+        ":drive_event_proto_lib",
+    ],
+)
+
+proto_library(
+    name = "drive_event_proto_lib",
+    srcs = [
+        "drive_event.proto",
+    ],
+    deps = [
+        ":header_proto_lib",
+        "//modules/localization/proto:pose_proto_lib",
+    ],
+)
+
+proto_library(
+    name = "drive_state_proto_lib",
+    srcs = [
+        "drive_state.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "drive_state_proto",
+    deps = [
+        ":drive_state_proto_lib",
+    ],
+)

@@ -5,7 +5,7 @@ import routingPointPin from "assets/images/routing/pin.png";
 
 import PARAMETERS from "store/config/parameters.yml";
 import STORE from "store";
-import WS from "store/websocket.js";
+import WS from "store/websocket";
 import { drawImage } from "utils/draw";
 
 export default class RoutingEditor {
@@ -27,7 +27,7 @@ export default class RoutingEditor {
         camera.far = PARAMETERS.camera[pov].far;
 
         camera.updateProjectionMatrix();
-        WS.requestMapElementsByRadius(this.EDITING_MAP_RADIUS);
+        WS.requestMapElementIdsByRadius(this.EDITING_MAP_RADIUS);
     }
 
     disableEditingMode(scene) {

@@ -8,6 +8,8 @@ import "modules/common/proto/pnc_point.proto";
 import "modules/localization/proto/localization.proto";
 import "modules/routing/proto/routing.proto";
 import "modules/perception/proto/traffic_light_detection.proto";
+import "modules/planning/proto/sl_boundary.proto";
+import "modules/planning/proto/decision.proto";
 
 message Debug {
   optional PlanningData planning_data = 2;
@@ -84,7 +86,49 @@ message SignalLightDebug {
   repeated SignalDebug signal = 3;
 }
 
-// next id: 17
+message DecisionTag {
+  optional string decider_tag = 1;
+  optional apollo.planning.ObjectDecisionType decision = 2;
+}
+
+message ObstacleDebug {
+  optional string id = 1;
+  optional apollo.planning.SLBoundary sl_boundary = 2;
+  repeated DecisionTag decision_tag = 3;
+}
+
+message ReferenceLineDebug {
+  optional string id = 1;
+  optional double length = 2;
+  optional double cost = 3;
+  optional bool is_change_lane_path = 4;
+  optional bool is_drivable = 5;
+  optional bool is_protected = 6;
+}
+
+message ChangeLaneState {
+   enum State {
+       IN_CHANGE_LANE = 1; // during change lane state
+       CHANGE_LANE_FAILED = 2; // change lane failed
+       CHANGE_LANE_SUCCESS = 3; // change lane failed
+   }
+   optional State state = 1;
+   // the id of the route segment that the vehicle is driving on
+   optional string path_id = 2;
+   // the time stamp when the state started.
+   optional double timestamp = 3;
+}
+
+message SampleLayerDebug {
+  repeated apollo.common.SLPoint sl_point = 1;
+}
+
+message DpPolyGraphDebug {
+  repeated SampleLayerDebug sample_layer = 1;
+  repeated apollo.common.SLPoint min_cost_point = 2;
+}
+
+// next id: 21
 message PlanningData {
   // input
   optional apollo.localization.LocalizationEstimate adc_position = 7;
@@ -99,4 +143,54 @@ message PlanningData {
 
   optional apollo.common.Header prediction_header = 16;
   optional SignalLightDebug signal_light = 17;
+
+  repeated ObstacleDebug obstacle = 18;
+  repeated ReferenceLineDebug reference_line = 19;
+  optional DpPolyGraphDebug dp_poly_graph = 20;
+  optional LatticeStTraining lattice_st_image = 21;
+}
+
+message LatticeStPixel {
+  optional int32 s = 1;
+  optional int32 t = 2;
+  optional uint32 r = 3;
+  optional uint32 g = 4;
+  optional uint32 b = 5;
+}
+
+message LatticeStTraining {
+  repeated LatticeStPixel pixel = 1;
+  optional double timestamp = 2;
+  optional string annotation = 3;
+  optional uint32 num_s_grids = 4;
+  optional uint32 num_t_grids = 5;
+  optional double s_resolution = 6;
+  optional double t_resolution = 7;
+}
+
+message CloudReferenceLineRequest {
+  repeated apollo.routing.LaneSegment lane_segment = 1;
+}
+
+message CloudReferenceLineRoutingRequest {
+  optional apollo.routing.RoutingResponse routing = 1;
+}
+
+message CloudReferenceLinePoint {
+  optional double x = 1;
+  optional double y = 2;
+  optional double z = 3;
+  optional double theta = 4;
+  optional double kappa = 5;
+  optional double lane_s = 6;
+  optional double dkappa = 7;
+}
+
+message CloudReferenceLineSegment {
+  optional string lane_id = 1;
+  repeated CloudReferenceLinePoint point = 2;
+}
+
+message CloudReferenceLineResponse {
+  repeated CloudReferenceLineSegment segment = 1;
 }

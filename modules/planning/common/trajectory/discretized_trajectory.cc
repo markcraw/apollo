@@ -77,6 +77,10 @@ TrajectoryPoint DiscretizedTrajectory::EvaluateUsingLinearApproximation(
 
   if (it_lower == trajectory_points_.begin()) {
     return trajectory_points_.front();
+  } else if (it_lower == trajectory_points_.end()) {
+    AWARN << "When evaluate trajectory, relative_time(" << relative_time
+          << ") is too large";
+    return trajectory_points_.back();
   }
   return util::InterpolateUsingLinearApproximation(*(it_lower - 1), *it_lower,
                                                    relative_time);
@@ -134,6 +138,18 @@ const TrajectoryPoint& DiscretizedTrajectory::TrajectoryPointAt(
 TrajectoryPoint DiscretizedTrajectory::StartPoint() const {
   CHECK(!trajectory_points_.empty());
   return trajectory_points_.front();
+}
+
+double DiscretizedTrajectory::GetTemporalLength() const {
+  CHECK(!trajectory_points_.empty());
+  return trajectory_points_.back().relative_time() -
+         trajectory_points_.front().relative_time();
+}
+
+double DiscretizedTrajectory::GetSpatialLength() const {
+  CHECK(!trajectory_points_.empty());
+  return trajectory_points_.back().path_point().s() -
+         trajectory_points_.front().path_point().s();
 }
 
 std::uint32_t DiscretizedTrajectory::NumOfPoints() const {

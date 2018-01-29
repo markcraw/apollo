@@ -32,9 +32,9 @@ cc_library(
         "//modules/control/common:control_gflags",
         "//modules/control/common:interpolation_1d",
         "//modules/control/common:trajectory_analyzer",
-        "//modules/control/filters:digital_filter",
-        "//modules/control/filters:digital_filter_coefficients",
-        "//modules/control/filters:mean_filter",
+        "//modules/common/filters:digital_filter",
+        "//modules/common/filters:digital_filter_coefficients",
+        "//modules/common/filters:mean_filter",
         "//modules/control/proto:control_proto",
         "@eigen//:eigen",
     ],
@@ -58,9 +58,39 @@ cc_library(
         "//modules/control/common:interpolation_2d",
         "//modules/control/common:pid_controller",
         "//modules/control/common:trajectory_analyzer",
-        "//modules/control/filters:digital_filter",
-        "//modules/control/filters:digital_filter_coefficients",
+        "//modules/common/filters:digital_filter",
+        "//modules/common/filters:digital_filter_coefficients",
         "//modules/localization/common:localization_common",
+    ],
+)
+
+cc_library(
+    name = "mpc_controller",
+    srcs = [
+        "mpc_controller.cc",
+    ],
+    hdrs = [
+        "mpc_controller.h",
+    ],
+    deps = [
+        ":controller_interface",
+        "//modules/common:log",
+        "//modules/common/configs:vehicle_config_helper",
+        "//modules/common/math:euler_angles_zxy",
+        "//modules/common/math:lqr",
+        "//modules/common/math:math_utils",
+        "//modules/common/proto:common_proto",
+        "//modules/common/status",
+        "//modules/common/time",
+        "//modules/control/common:control_gflags",
+        "//modules/control/common:interpolation_1d",
+        "//modules/control/common:interpolation_2d",
+        "//modules/control/common:trajectory_analyzer",
+        "//modules/common/filters:digital_filter",
+        "//modules/common/filters:digital_filter_coefficients",
+        "//modules/common/filters:mean_filter",
+        "//modules/control/proto:control_proto",
+        "@eigen//:eigen",
     ],
 )
 
@@ -71,6 +101,7 @@ cc_library(
         ":controller_interface",
         ":lat_controller",
         ":lon_controller",
+        ":mpc_controller",
         "@eigen//:eigen",
     ],
 )
@@ -87,6 +118,7 @@ cc_library(
         ":controller_interface",
         ":lat_controller",
         ":lon_controller",
+        ":mpc_controller",
         "//modules/canbus/proto:canbus_proto",
         "//modules/common:log",
         "//modules/common/time",
@@ -126,6 +158,26 @@ cc_test(
     data = ["//modules/control:control_testdata"],
     deps = [
         ":lat_controller",
+        "//modules/common:log",
+        "//modules/common/time",
+        "//modules/common/util",
+        "//modules/common/vehicle_state:vehicle_state_provider",
+        "//modules/control/common:control_gflags",
+        "//modules/control/proto:control_proto",
+        "//modules/planning/proto:planning_proto",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "mpc_controller_test",
+    size = "small",
+    srcs = [
+        "mpc_controller_test.cc",
+    ],
+    data = ["//modules/control:control_testdata"],
+    deps = [
+        ":mpc_controller",
         "//modules/common:log",
         "//modules/common/time",
         "//modules/common/util",

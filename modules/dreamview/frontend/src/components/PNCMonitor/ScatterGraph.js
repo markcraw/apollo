@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import Chart from "chart.js";
-import ChartZoom from "chartjs-plugin-zoom";
 
 Chart.plugins.register({
     afterDatasetsDraw: function(chart, easing) {
@@ -9,7 +8,7 @@ Chart.plugins.register({
             if (dataset.showText) {
                 const meta = chart.getDatasetMeta(index);
                 const element = meta.data[Math.floor(meta.data.length / 2)];
-                const fontSize = 13;
+                const fontSize = 15;
                 const fontStyle = 'normal';
                 const fontFamily = 'Helvetica Neue';
                 chart.ctx.font = Chart.helpers.fontString(fontSize, fontStyle, fontFamily);
@@ -26,6 +25,8 @@ Chart.plugins.register({
     }
 });
 
+Chart.defaults.global.defaultFontColor = '#FFFFFF';
+
 export default class ScatterGraph extends React.Component {
     initializeCanvas(title, options) {
         this.name2idx = {};
@@ -36,14 +37,6 @@ export default class ScatterGraph extends React.Component {
             },
             legend: {
                 display: options.legend.display,
-            },
-            pan: {
-                enabled: true,
-                mode: 'xy'
-            },
-            zoom: {
-                enable: true,
-                mode: 'xy',
             },
             tooltips: {
                 enable: true,
@@ -62,7 +55,11 @@ export default class ScatterGraph extends React.Component {
                 const axisOptions = {
                     id: `${axis}-axis-0`,
                     scaleLabel: { display: true, labelString: setting.labelString },
-                    ticks: { min: setting.min, max: setting.max }
+                    ticks: { min: setting.min, max: setting.max },
+                    gridLines: {
+                        color: 'rgba(153, 153, 153, 0.5)',
+                        zeroLineColor: 'rgba(153, 153, 153, 0.7)',
+                    }
                 };
                 if (!chartOptions.scales[name]) {
                     chartOptions.scales[name] = [];

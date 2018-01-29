@@ -34,25 +34,27 @@ namespace planning {
 
 using common::adapter::AdapterManager;
 
-#define RUN_GOLDEN_TEST                                            \
-  {                                                                \
-    const ::testing::TestInfo* const test_info =                   \
-        ::testing::UnitTest::GetInstance()->current_test_info();   \
-    bool run_planning_success = RunPlanning(test_info->name(), 0); \
-    EXPECT_TRUE(run_planning_success);                             \
+#define RUN_GOLDEN_TEST(case_num)                                         \
+  {                                                                       \
+    const ::testing::TestInfo* const test_info =                          \
+        ::testing::UnitTest::GetInstance()->current_test_info();          \
+    bool run_planning_success = RunPlanning(test_info->name(), case_num); \
+    EXPECT_TRUE(run_planning_success);                                    \
   }
 
-  #define TMAIN \
-  int main(int argc, char **argv) {  \
-      ::testing::InitGoogleTest(&argc, argv); \
-      ::google::ParseCommandLineFlags(&argc, &argv, true); \
-      return RUN_ALL_TESTS(); \
+#define TMAIN                                            \
+  int main(int argc, char** argv) {                      \
+    ::testing::InitGoogleTest(&argc, argv);              \
+    ::google::ParseCommandLineFlags(&argc, &argv, true); \
+    return RUN_ALL_TESTS();                              \
   }
+
 DECLARE_string(test_routing_response_file);
 DECLARE_string(test_localization_file);
 DECLARE_string(test_chassis_file);
 DECLARE_string(test_data_dir);
 DECLARE_string(test_prediction_file);
+DECLARE_string(test_traffic_light_file);
 DECLARE_string(test_previous_planning_file);
 
 class PlanningTestBase : public ::testing::Test {

@@ -17,16 +17,10 @@
 #ifndef MODULES_PLANNING_PLANNER_PLANNER_H_
 #define MODULES_PLANNING_PLANNER_PLANNER_H_
 
-#include <vector>
-
 #include "modules/common/proto/pnc_point.pb.h"
 #include "modules/common/status/status.h"
-#include "modules/common/vehicle_state/vehicle_state_provider.h"
 #include "modules/planning/common/frame.h"
-#include "modules/planning/common/trajectory/discretized_trajectory.h"
-#include "modules/planning/proto/planning.pb.h"
 #include "modules/planning/proto/planning_config.pb.h"
-#include "modules/planning/proto/planning_internal.pb.h"
 
 /**
  * @namespace apollo::planning
@@ -56,13 +50,22 @@ class Planner {
   virtual apollo::common::Status Init(const PlanningConfig& config) = 0;
 
   /**
-   * @brief Compute a trajectory for execution.
-   * @param start_point The trajectory point where planning starts
-   * @param trajectory_pb The computed trajectory
+   * @brief Compute trajectories for execution.
+   * @param planning_init_point The trajectory point where planning starts.
+   * @param frame Current planning frame.
    * @return OK if planning succeeds; error otherwise.
    */
-
   virtual apollo::common::Status Plan(
+      const common::TrajectoryPoint& planning_init_point, Frame* frame) = 0;
+
+  /**
+   * @brief Compute a trajectory for execution.
+   * @param planning_init_point The trajectory point where planning starts.
+   * @param frame Current planning frame.
+   * @param reference_line_info The computed reference line.
+   * @return OK if planning succeeds; error otherwise.
+   */
+  virtual apollo::common::Status PlanOnReferenceLine(
       const common::TrajectoryPoint& planning_init_point, Frame* frame,
       ReferenceLineInfo* reference_line_info) = 0;
 };

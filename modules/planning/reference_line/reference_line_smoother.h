@@ -15,24 +15,48 @@
  *****************************************************************************/
 
 /**
- * @file qp_spline_reference_line_smoother.h
+ * @file
  **/
 
 #ifndef MODULES_PLANNING_REFERENCE_LINE_REFERENCE_LINE_SMOOTHER_H_
 #define MODULES_PLANNING_REFERENCE_LINE_REFERENCE_LINE_SMOOTHER_H_
 
+#include <vector>
+
+#include "modules/planning/proto/reference_line_smoother_config.pb.h"
 #include "modules/planning/reference_line/reference_line.h"
 
 namespace apollo {
 namespace planning {
 
+struct AnchorPoint {
+  common::PathPoint path_point;
+  double lateral_bound = 0.0;
+  double longitudinal_bound = 0.0;
+  // enforce smoother to strictly follow this reference point
+  bool enforced = false;
+};
+
 class ReferenceLineSmoother {
  public:
-  ReferenceLineSmoother() = default;
+  explicit ReferenceLineSmoother(const ReferenceLineSmootherConfig& config)
+      : config_(config) {}
+
+  /**
+   * Smoothing constraints
+   */
+  virtual void SetAnchorPoints(
+      const std::vector<AnchorPoint>& achor_points) = 0;
+
+  /**
+   * Smooth a given reference line
+   */
+  virtual bool Smooth(const ReferenceLine&, ReferenceLine* const) = 0;
 
   virtual ~ReferenceLineSmoother() = default;
 
-  virtual bool Smooth(const ReferenceLine&, ReferenceLine* const) = 0;
+ protected:
+  ReferenceLineSmootherConfig config_;
 };
 
 }  // namespace planning

@@ -22,11 +22,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "modules/prediction/proto/fnn_vehicle_model.pb.h"
-#include "modules/prediction/proto/lane_graph.pb.h"
-
 #include "modules/prediction/container/obstacles/obstacle.h"
 #include "modules/prediction/evaluator/evaluator.h"
+#include "modules/prediction/proto/fnn_vehicle_model.pb.h"
+#include "modules/prediction/proto/lane_graph.pb.h"
 
 namespace apollo {
 namespace prediction {
@@ -92,6 +91,14 @@ class MLPEvaluator : public Evaluator {
    * @brief Compute probability
    */
   double ComputeProbability(const std::vector<double>& feature_values);
+
+  /**
+   * @brief Save offline feature values in proto
+   * @param Lane sequence
+   * @param Vector of feature values
+   */
+  void SaveOfflineFeatures(LaneSequence* sequence,
+                           const std::vector<double>& feature_values);
 
  private:
   std::unordered_map<int, std::vector<double>> obstacle_feature_values_map_;

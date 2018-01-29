@@ -17,6 +17,7 @@
 #include "modules/dreamview/backend/simulation_world/simulation_world_updater.h"
 
 #include "google/protobuf/util/json_util.h"
+#include "modules/common/util/json_util.h"
 #include "modules/common/util/map_util.h"
 #include "modules/dreamview/backend/common/dreamview_gflags.h"
 #include "modules/map/hdmap/hdmap_util.h"
@@ -26,12 +27,14 @@ namespace dreamview {
 
 using apollo::common::adapter::AdapterManager;
 using apollo::common::monitor::MonitorMessageItem;
-using apollo::common::util::GetProtoFromASCIIFile;
 using apollo::common::util::ContainsKey;
+using apollo::common::util::GetProtoFromASCIIFile;
+using apollo::common::util::JsonUtil;
 using apollo::hdmap::EndWayPointFile;
 using apollo::routing::RoutingRequest;
-using google::protobuf::util::MessageToJsonString;
 using Json = nlohmann::json;
+using google::protobuf::util::JsonStringToMessage;
+using google::protobuf::util::MessageToJsonString;
 
 SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
                                                SimControl *sim_control,
@@ -41,30 +44,24 @@ SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
       map_service_(map_service),
       websocket_(websocket),
       sim_control_(sim_control) {
-  // Initialize points of interest
-  LoadPOI();
-
   websocket_->RegisterMessageHandler(
       "RetrieveMapData",
       [this](const Json &json, WebSocketHandler::Connection *conn) {
         auto iter = json.find("elements");
         if (iter != json.end()) {
-          MapElementIds map_element_ids(*iter);
-          auto retrieved = map_service_->RetrieveMapElements(map_element_ids);
-
-          std::string retrieved_json_string;
-          MessageToJsonString(retrieved, &retrieved_json_string);
-
-          Json response;
-          response["type"] = "MapData";
-          response["data"] = Json::parse(retrieved_json_string);
-
-          websocket_->SendData(conn, response.dump());
+          MapElementIds map_element_ids;
+          if (JsonStringToMessage(iter->dump(), &map_element_ids).ok()) {
+            auto retrieved = map_service_->RetrieveMapElements(map_element_ids);
+            websocket_->SendData(
+                conn, JsonUtil::ProtoToTypedJson("MapData", retrieved).dump());
+          } else {
+            AERROR << "Failed to parse MapElementIds from json";
+          }
         }
       });
 
   websocket_->RegisterMessageHandler(
-      "RetrieveMapElementsByRadius",
+      "RetrieveMapElementIdsByRadius",
       [this](const Json &json, WebSocketHandler::Connection *conn) {
         auto radius = json.find("radius");
         if (radius == json.end()) {
@@ -72,8 +69,22 @@ SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
           return;
         }
 
-        Json response = sim_world_service_.GetMapElements(*radius);
-        response["type"] = "MapElements";
+        if (!radius->is_number()) {
+          AERROR << "Expect radius with type 'number', but was "
+                 << radius->type_name();
+          return;
+        }
+
+        Json response;
+        response["type"] = "MapElementIds";
+        response["mapRadius"] = *radius;
+
+        MapElementIds ids;
+        sim_world_service_.GetMapElementIds(*radius, &ids);
+        std::string elementIds;
+        MessageToJsonString(ids, &elementIds);
+        response["mapElementIds"] = Json::parse(elementIds);
+
         websocket_->SendData(conn, response.dump());
       });
 
@@ -108,14 +119,23 @@ SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
           return;
         }
 
+        auto planning = json.find("planning");
+        if (planning != json.end() && planning->is_boolean()) {
+          enable_pnc_monitor_ = json["planning"];
+        }
         std::string to_send;
         {
           // Pay the price to copy the data instead of sending data over the
           // wire while holding the lock.
           boost::shared_lock<boost::shared_mutex> reader_lock(mutex_);
-          to_send = simulation_world_json_;
+          to_send = simulation_world_;
         }
-        websocket_->SendData(conn, to_send, true);
+        if (FLAGS_enable_update_size_check && !enable_pnc_monitor_ &&
+            to_send.size() > FLAGS_max_update_size) {
+          AWARN << "update size is too big:" << to_send.size();
+          return;
+        }
+        websocket_->SendBinaryData(conn, to_send, true);
       });
 
   websocket_->RegisterMessageHandler(
@@ -129,10 +149,22 @@ SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
           for (const auto &landmark : poi_.landmark()) {
             Json place;
             place["name"] = landmark.name();
-            place["x"] = landmark.waypoint().pose().x();
-            place["y"] = landmark.waypoint().pose().y();
+            Json waypoint_list;
+            for (const auto &waypoint : landmark.waypoint()) {
+              Json point;
+              point["x"] = waypoint.pose().x();
+              point["y"] = waypoint.pose().y();
+              waypoint_list.push_back(point);
+            }
+            place["waypoint"] = waypoint_list;
             poi_list.push_back(place);
           }
+        } else {
+          sim_world_service_.PublishMonitorMessage(MonitorMessageItem::ERROR,
+                                                   "Failed to load default "
+                                                   "POI. Please make sure the "
+                                                   "file exists at " +
+                                                       EndWayPointFile());
         }
         response["poi"] = poi_list;
         websocket_->SendData(conn, response.dump());
@@ -156,30 +188,33 @@ SimulationWorldUpdater::SimulationWorldUpdater(WebSocketHandler *websocket,
 
 bool SimulationWorldUpdater::ConstructRoutingRequest(
     const Json &json, RoutingRequest *routing_request) {
-  // Input validations
+  routing_request->clear_waypoint();
+  // set start point
   if (!ContainsKey(json, "start")) {
-    AERROR << "Cannot prepare a routing request: input validation failed.";
+    AERROR << "Failed to prepare a routing request: start point not found.";
     return false;
   }
 
-  // set start point
   auto start = json["start"];
-  if (!ContainsKey(start, "x") || !ContainsKey(start, "y")) {
-    AERROR << "Failed to prepare a routing request: start point not found";
+  if (!ValidateCoordinate(start)) {
+    AERROR << "Failed to prepare a routing request: invalid start point.";
     return false;
   }
-  routing_request->clear_waypoint();
-  map_service_->ConstructLaneWayPoint(start["x"], start["y"],
-                                      routing_request->add_waypoint());
+  if (!map_service_->ConstructLaneWayPoint(start["x"], start["y"],
+                                           routing_request->add_waypoint())) {
+    AERROR << "Failed to prepare a routing request:"
+           << " cannot locate start point on map.";
+    return false;
+  }
 
   // set way point(s) if any
   auto iter = json.find("waypoint");
-  if (iter != json.end()) {
+  if (iter != json.end() && iter->is_array()) {
     auto *waypoint = routing_request->mutable_waypoint();
     for (size_t i = 0; i < iter->size(); ++i) {
       auto &point = (*iter)[i];
-      if (!ContainsKey(point, "x") || !ContainsKey(point, "y")) {
-        AERROR << "Failed to prepare a routing request: waypoint not found";
+      if (!ValidateCoordinate(point)) {
+        AERROR << "Failed to prepare a routing request: invalid waypoint.";
         return false;
       }
 
@@ -191,18 +226,22 @@ bool SimulationWorldUpdater::ConstructRoutingRequest(
   }
 
   // set end point
-  auto *end_point = routing_request->add_waypoint();
   if (!ContainsKey(json, "end")) {
-    AERROR << "Failed to prepare a routing request: end point not found";
+    AERROR << "Failed to prepare a routing request: end point not found.";
     return false;
   }
 
   auto end = json["end"];
-  if (!ContainsKey(end, "x") || !ContainsKey(end, "y")) {
-    AERROR << "Failed to prepare a routing request: end point not found";
+  if (!ValidateCoordinate(end)) {
+    AERROR << "Failed to prepare a routing request: invalid end point.";
     return false;
   }
-  map_service_->ConstructLaneWayPoint(end["x"], end["y"], end_point);
+  if (!map_service_->ConstructLaneWayPoint(end["x"], end["y"],
+                                           routing_request->add_waypoint())) {
+    AERROR << "Failed to prepare a routing request:"
+           << " cannot locate end point on map.";
+    return false;
+  }
 
   AINFO << "Constructed RoutingRequest to be sent:\n"
         << routing_request->DebugString();
@@ -210,10 +249,23 @@ bool SimulationWorldUpdater::ConstructRoutingRequest(
   return true;
 }
 
+bool SimulationWorldUpdater::ValidateCoordinate(const nlohmann::json &json) {
+  if (!ContainsKey(json, "x") || !ContainsKey(json, "y")) {
+    AERROR << "Failed to find x or y coordinate.";
+    return false;
+  }
+  if (json.find("x")->is_number() && json.find("y")->is_number()) {
+    return true;
+  }
+  AERROR << "Both x and y coordinate should be a number.";
+  return false;
+}
+
 void SimulationWorldUpdater::Start() {
   // start ROS timer, one-shot = false, auto-start = true
-  timer_ = AdapterManager::CreateTimer(ros::Duration(kSimWorldTimeInterval),
-                                       &SimulationWorldUpdater::OnTimer, this);
+  timer_ =
+      AdapterManager::CreateTimer(ros::Duration(kSimWorldTimeIntervalMs / 1000),
+                                  &SimulationWorldUpdater::OnTimer, this);
 }
 
 void SimulationWorldUpdater::OnTimer(const ros::TimerEvent &event) {
@@ -221,15 +273,13 @@ void SimulationWorldUpdater::OnTimer(const ros::TimerEvent &event) {
 
   {
     boost::unique_lock<boost::shared_mutex> writer_lock(mutex_);
-
-    simulation_world_json_ =
-        sim_world_service_.GetUpdateAsJson(FLAGS_sim_map_radius).dump();
+    simulation_world_ = sim_world_service_.GetWireFormatString(
+        FLAGS_sim_map_radius, enable_pnc_monitor_);
   }
 }
 
 bool SimulationWorldUpdater::LoadPOI() {
-  if (poi_.landmark_size() > 0 ||
-      GetProtoFromASCIIFile(EndWayPointFile(), &poi_)) {
+  if (GetProtoFromASCIIFile(EndWayPointFile(), &poi_)) {
     return true;
   }
 

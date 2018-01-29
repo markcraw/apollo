@@ -15,21 +15,22 @@
  *****************************************************************************/
 
 /**
-* @file : spline_1d.h
-* @brief: piecewise smoothing spline class
-*       1. Model description: piecewise smoothing spline are made by pieces of
-*smoothing splines
-*          joint at knots;
-*       2. To guarantee smoothness, pieces value at knots should joint together
-*with
-*           same value, derivative, and etc. Higher the order, More smoothness
-*the piecewise spline;
-**/
+ * @file : spline_1d.h
+ * @brief: piecewise smoothing spline class
+ *       1. Model description: piecewise smoothing spline are made by pieces of
+ *smoothing splines
+ *          joint at knots;
+ *       2. To guarantee smoothness, pieces value at knots should joint together
+ *with
+ *           same value, derivative, and etc. Higher the order, More smoothness
+ *the piecewise spline;
+ **/
 
 #ifndef MODULES_PLANNING_MATH_SMOOTHING_SPLINE_SPLINE_1D_H_
 #define MODULES_PLANNING_MATH_SMOOTHING_SPLINE_SPLINE_1D_H_
 
 #include <vector>
+
 #include "Eigen/Core"
 
 #include "modules/planning/math/polynomial_xd.h"
@@ -51,8 +52,7 @@ class Spline1d {
   double ThirdOrderDerivative(const double x) const;
 
   // @brief: set spline segments
-  bool SetSplineSegs(const Eigen::MatrixXd& params, const uint32_t order);
-  Spline1dSeg* mutable_smoothing_spline(const uint32_t index);
+  bool SetSplineSegs(const Eigen::MatrixXd& param_matrix, const uint32_t order);
 
   const std::vector<double>& x_knots() const;
   uint32_t spline_order() const;
